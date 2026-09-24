@@ -10,6 +10,7 @@ hand-rolled diffing:
 
 from __future__ import annotations
 
+import os
 import shutil
 import stat
 import subprocess
@@ -30,8 +31,6 @@ GIT_ENV_AUTHOR = {"GIT_AUTHOR_NAME": "swecrew", "GIT_AUTHOR_EMAIL": "swecrew@loc
 
 
 def _run(cmd: list[str], cwd: Path, timeout: float, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
-    import os
-
     full_env = {**os.environ, **(env or {})}
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=full_env, check=False)
 
@@ -99,7 +98,12 @@ class Workspace:
 
     # ------------------------------------------------------------------ per-candidate lifecycle
     def reset(self) -> None:
-        """Fully revert to the baseline commit, including new files, without touching HEAD."""
+        """Fully revert to the baseline commit, including new files, without touching HEAD.
+
+        Deliberately plain ``-fd`` (not ``-x``): a target repo's own gitignored build artifacts
+        (e.g. an editable install's ``*.egg-info``, written once by ``prepare_env``) must survive
+        resets between candidates. Bytecode-cache staleness is instead prevented at the source,
+        by disabling ``.pyc`` writing for test runs (see ``run_tests``)."""
         _run(["git", "reset", "-q", "--hard", "HEAD"], self.path, 30)
         _run(["git", "clean", "-q", "-fd"], self.path, 30)
 
@@ -163,9 +167,14 @@ class Workspace:
             shell_cmd = f'{_quote(python)} -m pytest -q {" ".join(_quote(t) for t in targets)}'
         else:
             shell_cmd = f"{_quote(python)} -m pytest -q"
+        # PYTHONDONTWRITEBYTECODE guards against a real hazard: the same repo path is reused
+        # across candidates (reset -> edit -> test), and on filesystems with coarse mtime
+        # resolution, Python's default timestamp-based .pyc invalidation can miss an edit that
+        # lands within the same tick as the previous compile -- silently testing stale code.
+        env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
         try:
             result = subprocess.run(shell_cmd, shell=True, cwd=self.path, capture_output=True,  # noqa: S602
-                                    text=True, timeout=timeout)
+                                    text=True, timeout=timeout, env=env)
         except subprocess.TimeoutExpired as exc:
             return TestOutcome(ran=True, timed_out=True, error="test run timed out",
                                stdout_tail=_tail((exc.stdout or "") + (exc.stderr or "")))

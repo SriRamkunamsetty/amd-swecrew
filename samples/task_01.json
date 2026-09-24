@@ -1,0 +1,6 @@
+{
+  "problem_statement": "Calculator.add(a, b) subtracts instead of adding: add(2, 3) returns -1 instead of 5.",
+  "repo": "repo",
+  "fail_to_pass": ["tests/test_calc.py::test_add"],
+  "pass_to_pass": ["tests/test_calc.py::test_mul"]
+}

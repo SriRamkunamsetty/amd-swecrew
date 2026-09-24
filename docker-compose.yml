@@ -1,0 +1,29 @@
+# Production deployment on an AMD GPU host (ROCm drivers installed).
+#   docker compose up -d --build
+# Secrets come from the environment / .env at *runtime* only; nothing is baked into images.
+
+x-rocm: &rocm
+  devices: ["/dev/kfd", "/dev/dri"]
+  group_add: ["video", "render"]
+  security_opt: ["seccomp=unconfined"]
+  shm_size: "16g"
+  ipc: host
+  restart: unless-stopped
+
+services:
+  swecrew:
+    <<: *rocm
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: swecrew:latest
+    environment:
+      APP_SERVE_CMD: "uvicorn swecrew.service:app --host 0.0.0.0 --port 8082 --workers 1"
+      SWECREW_API_KEYS: "${SWECREW_API_KEYS:-}"
+      LLM_VRAM_BUDGET_GIB: "${SWECREW_VRAM_GIB:-36}"
+    ports: ["8082:8082"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8082/healthz')"]
+      interval: 30s
+      start_period: 600s
+

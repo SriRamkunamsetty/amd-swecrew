@@ -1,0 +1,6 @@
+# LLM serving on AMD GPUs.
+# vLLM: use the ROCm build that matches the base image's ROCm/PyTorch. If no wheel is available for
+# the mandated base, build with INSTALL_VLLM=0: the entrypoint then serves the model with the bundled
+# transformers server (slower, same API, still on the GPU).
+transformers>=4.46
+accelerate>=0.34

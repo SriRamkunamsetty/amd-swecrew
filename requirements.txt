@@ -1,0 +1,8 @@
+# Runtime dependencies for the SweCrew container (installed on top of the ROCm base image,
+# which already ships torch). Keep this list small: image size is a hard gate.
+httpx>=0.27
+pydantic>=2.6
+pydantic-settings>=2.2
+fastapi>=0.110
+uvicorn>=0.29
+huggingface_hub>=0.24
